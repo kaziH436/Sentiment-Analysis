@@ -2,7 +2,7 @@ fastapi==0.115.12
 uvicorn[standard]==0.34.2
 transformers==4.51.3
 datasets==3.6.0
-torch==2.7.0
+torch==2.9.0
 scikit-learn==1.6.1
 pandas==2.2.3
 numpy==2.2.5
