@@ -71,7 +71,17 @@ def prepare_data(data_dir: str | Path, csv_path: str | None = None,
     if sample_size and len(frame) > sample_size:
         frame, _ = train_test_split(frame, train_size=sample_size, stratify=frame.label, random_state=seed)
         frame = frame.reset_index(drop=True)
-    train, validation = train_test_split(frame, test_size=0.1, stratify=frame.label, random_state=seed)
+    # Keep the test partition untouched until the final evaluation: 80/10/10 overall.
+    train_validation, test = train_test_split(
+        frame, test_size=0.1, stratify=frame.label, random_state=seed
+    )
+    train, validation = train_test_split(
+        train_validation,
+        test_size=1 / 9,
+        stratify=train_validation.label,
+        random_state=seed,
+    )
     train.to_csv(processed_dir / "train.csv", index=False)
     validation.to_csv(processed_dir / "validation.csv", index=False)
-    return train.reset_index(drop=True), validation.reset_index(drop=True)
+    test.to_csv(processed_dir / "test.csv", index=False)
+    return tuple(part.reset_index(drop=True) for part in (train, validation, test))
