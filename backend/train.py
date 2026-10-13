@@ -79,9 +79,15 @@ def main():
     tokenizer.save_pretrained(args.output_dir)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    with (output_dir / "test_metrics.json").open("w", encoding="utf-8") as metrics_file:
-        json.dump({key: float(value) if isinstance(value, np.generic) else value
-                   for key, value in test_metrics.items()}, metrics_file, indent=2)
+    for filename, metrics_to_save in (
+        ("validation_metrics.json", validation_metrics),
+        ("test_metrics.json", test_metrics),
+    ):
+        with (output_dir / filename).open("w", encoding="utf-8") as metrics_file:
+            json.dump({key: float(value) if isinstance(value, np.generic) else value
+                       for key, value in metrics_to_save.items()}, metrics_file, indent=2)
+    with (output_dir / "training_history.json").open("w", encoding="utf-8") as history_file:
+        json.dump(trainer.state.log_history, history_file, indent=2)
     print(f"Saved fine-tuned model to {args.output_dir}")
 
 

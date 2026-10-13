@@ -28,7 +28,7 @@ You can instead provide a CSV with `text` and `sentiment` columns using `--csv p
 
 ## Data processing
 
-`backend/preprocessing.py` normalizes Unicode, removes URLs and user mentions, retains hashtag words, strips HTML/control characters, collapses whitespace, removes empty rows and exact duplicate texts, validates labels, and performs a stratified 80/10/10 train/validation/test split. The test set is held out during training and model selection; it is evaluated once after training, and its metrics are saved to `artifacts/model/test_metrics.json`. The validation set selects the best epoch by F1. It deliberately does not remove stopwords, punctuation, or emojis: those carry sentiment information. BERT's own tokenizer creates input IDs and attention masks; labels are encoded as integers.
+`backend/preprocessing.py` normalizes Unicode, removes URLs and user mentions, retains hashtag words, strips HTML/control characters, collapses whitespace, removes empty rows and exact duplicate texts, validates labels, and performs a stratified 80/10/10 train/validation/test split. The test set is held out during training and model selection; it is evaluated once after training. Validation metrics, test metrics, and epoch-by-epoch training history are printed/saved under `artifacts/model/` as `validation_metrics.json`, `test_metrics.json`, and `training_history.json`. The validation set selects the best epoch by F1. It deliberately does not remove stopwords, punctuation, or emojis: those carry sentiment information. BERT's own tokenizer creates input IDs and attention masks; labels are encoded as integers.
 
 ## API
 
