@@ -1,0 +1,38 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      MODEL_DIR: /app/artifacts/model
+      DATA_DIR: /app/data
+      TRAIN_SAMPLE_SIZE: ${TRAIN_SAMPLE_SIZE:-20000}
+      MAX_LENGTH: ${MAX_LENGTH:-128}
+      EPOCHS: ${EPOCHS:-2}
+      BATCH_SIZE: ${BATCH_SIZE:-16}
+      LEARNING_RATE: ${LEARNING_RATE:-2e-5}
+    ports:
+      - "8000:8000"
+    volumes:
+      - model_data:/app/artifacts
+      - dataset_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  model_data:
+  dataset_data:

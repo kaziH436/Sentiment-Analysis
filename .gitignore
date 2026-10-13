@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project data, trained weights, and JavaScript dependencies
+data/raw/
+data/processed/
+artifacts/
+frontend/node_modules/
+frontend/dist/
