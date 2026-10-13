@@ -6,7 +6,7 @@ Sentiment140 contains roughly 1.6 million English tweets with noisy distant-supe
 
 ## Run locally
 
-Requirements: Docker Desktop / Docker Engine with Compose. The first training run needs internet access to download the dataset and pretrained BERT weights. Training the full dataset can take hours without a GPU.
+Requirements: Docker Desktop / Docker Engine with Compose. For local Python installs, use Python 3.11 (the included Dockerfile uses 3.11); Python 3.14 is not supported by the pinned `pydantic-core` build dependency yet. The first training run needs internet access to download the dataset and pretrained BERT weights. Training the full dataset can take hours without a GPU.
 
 ```sh
 cp .env.example .env
@@ -15,9 +15,12 @@ docker compose up --build
 
 The API is at http://localhost:8000, interactive API docs at http://localhost:8000/docs, and dashboard at http://localhost:5173. On first start, the API trains the model if `artifacts/model` is absent. For a quicker smoke/demo run, set `TRAIN_SAMPLE_SIZE=20000` in `.env` (the model is correspondingly less robust). Training artifacts and cached data persist in Docker volumes.
 
-To run preprocessing/training outside Docker, install `backend/requirements.txt`, then:
+To run preprocessing/training outside Docker, create a Python 3.11 environment and install `backend/requirements.txt`:
 
 ```sh
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r backend/requirements.txt
 python -m backend.train --sample-size 20000
 ```
 
