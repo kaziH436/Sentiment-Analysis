@@ -6,6 +6,10 @@ import json
 import os
 from pathlib import Path
 
+# Tokenization happens before Trainer creates data-loader workers. Avoid forking
+# tokenizer worker pools into those child processes.
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from transformers import (AutoModelForSequenceClassification, AutoTokenizer,
@@ -63,6 +67,7 @@ def main():
         output_dir=str(Path(args.output_dir).parent / "checkpoints"),
         num_train_epochs=args.epochs, per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size, learning_rate=args.learning_rate,
+        dataloader_pin_memory=False,
         weight_decay=0.01, eval_strategy="epoch", save_strategy="epoch",
         load_best_model_at_end=True, metric_for_best_model="f1", greater_is_better=True,
         logging_steps=100, report_to="none", seed=42,
