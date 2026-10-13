@@ -2,18 +2,24 @@
 from __future__ import annotations
 
 import html
+import csv
+import io
 import re
+import shutil
 import unicodedata
 from pathlib import Path
+from urllib.request import Request, urlopen
+from zipfile import BadZipFile, ZipFile
 
 import pandas as pd
-from datasets import load_dataset
 from sklearn.model_selection import train_test_split
 
 URL_RE = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
 MENTION_RE = re.compile(r"(?<!\w)@[A-Za-z0-9_]+")
 HTML_RE = re.compile(r"<[^>]+>")
 SPACE_RE = re.compile(r"\s+")
+SENTIMENT140_URL = "https://cs.stanford.edu/people/alecmgo/trainingandtestdata.zip"
+SENTIMENT140_TRAIN_FILE = "training.1600000.processed.noemoticon.csv"
 
 
 def clean_text(value: object) -> str:
@@ -45,17 +51,59 @@ def encode_label(value: object) -> int:
     raise ValueError(f"Unsupported sentiment label: {value!r}")
 
 
-def load_source(csv_path: str | None = None) -> pd.DataFrame:
+def _download_sentiment140(data_dir: str | Path) -> Path:
+    """Download and cache Stanford's raw archive; no Hugging Face code is run."""
+    raw_dir = Path(data_dir) / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = raw_dir / "sentiment140.zip"
+    if archive_path.exists():
+        try:
+            with ZipFile(archive_path) as archive:
+                if any(Path(name).name == SENTIMENT140_TRAIN_FILE for name in archive.namelist()):
+                    return archive_path
+        except BadZipFile:
+            pass
+
+    temporary_path = archive_path.with_suffix(".zip.part")
+    request = Request(SENTIMENT140_URL, headers={"User-Agent": "sentiment-analysis-engine/1.0"})
+    print(f"Downloading raw Sentiment140 archive from Stanford to {archive_path}...")
+    with urlopen(request, timeout=60) as response, temporary_path.open("wb") as destination:
+        shutil.copyfileobj(response, destination)
+    try:
+        with ZipFile(temporary_path) as archive:
+            if not any(Path(name).name == SENTIMENT140_TRAIN_FILE for name in archive.namelist()):
+                raise ValueError(f"Downloaded archive does not contain {SENTIMENT140_TRAIN_FILE}")
+    except BadZipFile as exc:
+        temporary_path.unlink(missing_ok=True)
+        raise ValueError("Downloaded Sentiment140 archive is not a valid ZIP file") from exc
+    temporary_path.replace(archive_path)
+    return archive_path
+
+
+def load_source(csv_path: str | None = None, data_dir: str | Path = "data") -> pd.DataFrame:
     if csv_path:
         frame = pd.read_csv(csv_path)
         if not {"text", "sentiment"}.issubset(frame.columns):
             raise ValueError("CSV must contain 'text' and 'sentiment' columns")
         return frame[["text", "sentiment"]]
-    dataset = load_dataset("stanfordnlp/sentiment140", split="train")
-    frame = dataset.to_pandas()
-    text_col = "text" if "text" in frame else "tweet"
-    label_col = "sentiment" if "sentiment" in frame else "label"
-    return frame[[text_col, label_col]].rename(columns={text_col: "text", label_col: "sentiment"})
+
+    archive_path = _download_sentiment140(data_dir)
+    with ZipFile(archive_path) as archive:
+        train_member = next(
+            name for name in archive.namelist()
+            if Path(name).name == SENTIMENT140_TRAIN_FILE
+        )
+        records = []
+        with archive.open(train_member) as binary_file:
+            text_file = io.TextIOWrapper(binary_file, encoding="ISO-8859-1", newline="")
+            for row_number, row in enumerate(csv.reader(text_file, delimiter=",", quotechar='"'), start=1):
+                if len(row) != 6:
+                    raise ValueError(
+                        f"Malformed Sentiment140 row {row_number}: expected 6 columns, found {len(row)}"
+                    )
+                # Stanford's raw layout: polarity, tweet ID, date, query, user, tweet text.
+                records.append({"sentiment": int(row[0]), "text": row[5]})
+    return pd.DataFrame.from_records(records, columns=["text", "sentiment"])
 
 
 def prepare_data(data_dir: str | Path, csv_path: str | None = None,
@@ -63,7 +111,7 @@ def prepare_data(data_dir: str | Path, csv_path: str | None = None,
     data_dir = Path(data_dir)
     processed_dir = data_dir / "processed"
     processed_dir.mkdir(parents=True, exist_ok=True)
-    frame = load_source(csv_path)
+    frame = load_source(csv_path, data_dir)
     frame["text"] = frame["text"].map(clean_text)
     frame = frame[frame["text"].str.len() > 0].copy()
     frame["label"] = frame["sentiment"].map(encode_label)
